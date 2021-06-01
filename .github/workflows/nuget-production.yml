@@ -1,0 +1,24 @@
+name: Nuget push for releases
+
+on:
+  push:
+    branches: [ production ]
+
+jobs:
+  publish-dev:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 5.0.x
+      - name: Restore dependencies
+        run: dotnet restore R4Utils
+      - name: Build Release
+        run: dotnet build -c Release R4Utils
+      - name: Pack
+        run: dotnet pack --no-build --no-dependencies
+      - name: Push
+        run: dotnet nuget push R4Utils/bin/Release/R4Utils.1.0.0.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate

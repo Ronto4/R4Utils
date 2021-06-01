@@ -3,6 +3,17 @@
     <PropertyGroup>
         <TargetFramework>net5.0</TargetFramework>
         <Nullable>enable</Nullable>
+        <PackageId>R4Utils</PackageId>
+        <VersionPrefix>1.0.0</VersionPrefix>
+        <Authors>Ronto4</Authors>
     </PropertyGroup>
+
+    <PropertyGroup>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="../LICENSE" Pack="true" PackagePath="" />
+    </ItemGroup>
 
 </Project>
