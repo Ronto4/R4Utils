@@ -5,7 +5,7 @@ on:
     branches: [ production ]
 
 jobs:
-  publish-dev:
+  publish-production:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,6 +19,6 @@ jobs:
       - name: Build Release
         run: dotnet build -c Release R4Utils
       - name: Pack
-        run: dotnet pack --no-build --no-dependencies
+        run: dotnet pack -c Release --no-build --no-dependencies
       - name: Push
         run: dotnet nuget push R4Utils/bin/Release/R4Utils.1.0.0.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
