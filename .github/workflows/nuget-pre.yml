@@ -5,7 +5,7 @@ on:
     branches: [ master ]
 
 jobs:
-  publish-dev:
+  publish-pre:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,6 +21,6 @@ jobs:
       - name: Create Name
         run: echo "SUFFIX=pre.${GITHUB_RUN_ID}" >> $GITHUB_ENV
       - name: Pack
-        run: dotnet pack --no-build --no-dependencies --version-suffix $SUFFIX
+        run: dotnet pack -c Release --no-build --no-dependencies --version-suffix $SUFFIX
       - name: Push
         run: dotnet nuget push R4Utils/bin/Release/R4Utils.1.0.0-$SUFFIX.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
