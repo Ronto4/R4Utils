@@ -3,6 +3,7 @@ using R4Utils.Messaging.Exceptions;
 
 namespace R4Utils.Messaging
 {
+    #if FALSE
     /// <summary>
     /// Contains information shared for all <see cref="Message{TData}"/> types
     /// </summary>
@@ -50,4 +51,5 @@ namespace R4Utils.Messaging
             BasicContextGetter = basicContextGetter;
         }
     }
+#endif
 }
