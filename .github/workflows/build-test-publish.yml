@@ -1,0 +1,98 @@
+name: .NET Build & Test & Publish
+
+on: push
+
+jobs:
+  build-test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build Debug
+        run: dotnet build --no-restore --configuration Debug R4Utils
+      - name: Build Release
+        run: dotnet build --no-restore --configuration Release R4Utils
+      - name: Test
+        run: dotnet test --verbosity normal R4UtilsTester
+      - name: Upload dotnet results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Artifacts
+          path: R4Utils/bin/Release/net8.0
+        # Use always() to always run this step to publish results
+        if: ${{ always() }}
+        
+  publish-dev:
+    runs-on: ubuntu-latest
+    
+    needs: build-test
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore dependencies
+        run: dotnet restore R4Utils
+      - name: Build Debug
+        run: dotnet build -c Debug R4Utils
+      - name: Create Name
+        run: echo "SUFFIX=dev.$(tr /- .. <<<$GITHUB_REF).${GITHUB_RUN_ID}" >> $GITHUB_ENV
+      - name: Pack
+        run: dotnet pack --no-build --no-dependencies -c Debug -p:PackageId=R4UtilsDev --version-suffix $SUFFIX
+      - name: Push
+        run: dotnet nuget push R4Utils/bin/Debug/R4UtilsDev.1.0.0-$SUFFIX.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+        
+  publish-pre:
+    runs-on: ubuntu-latest
+    
+    needs: build-test
+    
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore dependencies
+        run: dotnet restore R4Utils
+      - name: Build Release
+        run: dotnet build -c Release R4Utils
+      - name: Create Name
+        run: echo "SUFFIX=pre.${GITHUB_RUN_ID}" >> $GITHUB_ENV
+      - name: Pack
+        run: dotnet pack -c Release --no-build --no-dependencies --version-suffix $SUFFIX
+      - name: Push
+        run: dotnet nuget push R4Utils/bin/Release/R4Utils.1.0.0-$SUFFIX.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+        
+  publish-production:
+    runs-on: ubuntu-latest
+    
+    needs: build-test
+    
+    if: github.ref == 'refs/heads/production'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore dependencies
+        run: dotnet restore R4Utils
+      - name: Build Release
+        run: dotnet build -c Release R4Utils
+      - name: Pack
+        run: dotnet pack -c Release --no-build --no-dependencies
+      - name: Push
+        run: dotnet nuget push R4Utils/bin/Release/R4Utils.1.0.0.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
