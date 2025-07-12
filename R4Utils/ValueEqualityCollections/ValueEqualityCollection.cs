@@ -32,10 +32,13 @@ file static class Helpers
 
         return cnt.Values.All(c => c == 0);
     }
+
+    public static HashSet<(Guid, Guid)> AlreadyComparing { get; } = [];
 }
 
 /// <summary>
 /// A wrapper around an <see cref="ICollection{T}"/> that uses value equality of its elements for equality of the collections.
+/// <remarks>Note that this type does not guarantee any behaviour when using it in async code.</remarks>
 /// </summary>
 public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEqualityCollection<T>>,
     IEqualityOperators<ValueEqualityCollection<T>, ValueEqualityCollection<T>, bool> where T : IEquatable<T>
@@ -68,12 +71,18 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
     public OrderMode Ordering { get; }
 
     /// <summary>
+    /// An assumed unique ID for each instance of this type.
+    /// </summary>
+    private Guid Guid { get; }
+
+    /// <summary>
     /// Create a new wrapper around <paramref name="collection"/> that uses items equality for instance equality.
     /// </summary>
     public ValueEqualityCollection(ICollection<T> collection, OrderMode ordering)
     {
         Collection = collection;
         Ordering = ordering;
+        Guid = Guid.CreateVersion7();
     }
 
     public override string ToString() =>
@@ -98,13 +107,27 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
 
     private bool EqualityDispatch(ValueEqualityCollection<T> other)
     {
-        if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider && Collection is IList<T> list1 &&
-            other.Collection is IList<T> list2)
+        if (!Helpers.AlreadyComparing.Add((Guid, other.Guid)))
         {
-            return OrderedEquality(list1, list2);
+            // In case we are already comparing these two instances, we can safely return true as the first comparison will fail if they don't match.
+            return true;
         }
 
-        return Helpers.ScrambledEquals(Collection, other.Collection);
+        try
+        {
+            if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider &&
+                Collection is IList<T> list1 &&
+                other.Collection is IList<T> list2)
+            {
+                return OrderedEquality(list1, list2);
+            }
+
+            return Helpers.ScrambledEquals(Collection, other.Collection);
+        }
+        finally
+        {
+            Helpers.AlreadyComparing.Remove((Guid, other.Guid));
+        }
     }
 
     private static bool OrderedEquality(IList<T> list1, IList<T> list2) => list1.SequenceEqual(list2);
@@ -139,6 +162,7 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
 
 /// <summary>
 /// A wrapper around a <typeparamref name="TCollection"/> that uses value equality of its elements for equality of the collections.
+/// <remarks>Note that this type does not guarantee any behaviour when using it in async code.</remarks>
 /// </summary>
 public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
     IEquatable<ValueEqualityCollection<T, TCollection>>,
@@ -185,10 +209,16 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
     /// </summary>
     public OrderMode Ordering { get; }
 
+    /// <summary>
+    /// An assumed unique ID for each instance of this type.
+    /// </summary>
+    private Guid Guid { get; }
+
     internal ValueEqualityCollection(TCollection underlying, OrderMode ordering)
     {
         Underlying = underlying;
         Ordering = underlying is IList<T> ? ordering : OrderMode.Ignore;
+        Guid = Guid.CreateVersion7();
     }
 
     // Equality
@@ -200,13 +230,27 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
 
     private bool EqualityDispatch(ValueEqualityCollection<T, TCollection> other)
     {
-        if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider && Underlying is IList<T> list1 &&
-            other.Underlying is IList<T> list2)
+        if (!Helpers.AlreadyComparing.Add((Guid, other.Guid)))
         {
-            return OrderedEquality(list1, list2);
+            // In case we are already comparing these two instances, we can safely return true as the first comparison will fail if they don't match.
+            return true;
         }
 
-        return Helpers.ScrambledEquals(Underlying, other.Underlying);
+        try
+        {
+            if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider &&
+                Underlying is IList<T> list1 &&
+                other.Underlying is IList<T> list2)
+            {
+                return OrderedEquality(list1, list2);
+            }
+
+            return Helpers.ScrambledEquals(Underlying, other.Underlying);
+        }
+        finally
+        {
+            Helpers.AlreadyComparing.Remove((Guid, other.Guid));
+        }
     }
 
     private static bool OrderedEquality(IList<T> list1, IList<T> list2) => list1.SequenceEqual(list2);
