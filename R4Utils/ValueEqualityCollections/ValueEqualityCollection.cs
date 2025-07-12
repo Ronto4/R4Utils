@@ -120,8 +120,7 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
         return obj.GetType() == GetType() && Equals((ValueEqualityCollection<T>)obj);
     }
 
-    // TODO: Look into this, this might in fact be wrong.
-    public override int GetHashCode() => HashCode.Combine(Collection.Aggregate(0, HashCode.Combine), Ordering);
+    public override int GetHashCode() => Collection.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
 
     public void Add(T item) => Collection.Add(item);
 
@@ -154,8 +153,7 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         return Equals((ValueEqualityCollection<T, TCollection>)obj);
     }
 
-    // TODO: Look into this, this might in fact be wrong.
-    public override int GetHashCode() => HashCode.Combine(Underlying.Aggregate(0, HashCode.Combine), Ordering);
+    public override int GetHashCode() => Underlying.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
 
     /// <summary>
     /// Defines strategies of dealing with ordering when comparing two instances.
