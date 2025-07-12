@@ -34,6 +34,7 @@ file static class Helpers
     }
 
     public static HashSet<(Guid, Guid)> AlreadyComparing { get; } = [];
+    public static HashSet<Guid> AlreadyHashing { get; } = [];
 }
 
 /// <summary>
@@ -143,7 +144,23 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
         return obj.GetType() == GetType() && Equals((ValueEqualityCollection<T>)obj);
     }
 
-    public override int GetHashCode() => Collection.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
+    public override int GetHashCode()
+    {
+        if (!Helpers.AlreadyHashing.Add(Guid))
+        {
+            // We are already being hashed in an upper level. Return a constant as we don't want to recurse.
+            return 0;
+        }
+
+        try
+        {
+            return Collection.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
+        }
+        finally
+        {
+            Helpers.AlreadyHashing.Remove(Guid);
+        }
+    }
 
     public void Add(T item) => Collection.Add(item);
 
@@ -177,7 +194,23 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         return Equals((ValueEqualityCollection<T, TCollection>)obj);
     }
 
-    public override int GetHashCode() => Underlying.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
+    public override int GetHashCode()
+    {
+        if (!Helpers.AlreadyHashing.Add(Guid))
+        {
+            // We are already being hashed in an upper level. Return a constant as we don't want to recurse.
+            return 0;
+        }
+
+        try
+        {
+            return Underlying.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
+        }
+        finally
+        {
+            Helpers.AlreadyHashing.Remove(Guid);
+        }
+    }
 
     /// <summary>
     /// Defines strategies of dealing with ordering when comparing two instances.
