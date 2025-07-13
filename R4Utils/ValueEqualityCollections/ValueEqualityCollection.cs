@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 
 namespace R4Utils.ValueEqualityCollections;
@@ -32,9 +33,6 @@ file static class Helpers
 
         return cnt.Values.All(c => c == 0);
     }
-
-    public static HashSet<(Guid, Guid)> AlreadyComparing { get; } = [];
-    public static HashSet<Guid> AlreadyHashing { get; } = [];
 }
 
 /// <summary>
@@ -106,9 +104,11 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
         return ReferenceEquals(this, other) || EqualityDispatch(other);
     }
 
+    private HashSet<Guid> AlreadyComparing { get; } = [];
+
     private bool EqualityDispatch(ValueEqualityCollection<T> other)
     {
-        if (!Helpers.AlreadyComparing.Add((Guid, other.Guid)))
+        if (!AlreadyComparing.Add(other.Guid))
         {
             // In case we are already comparing these two instances, we can safely return true as the first comparison will fail if they don't match.
             return true;
@@ -127,7 +127,7 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
         }
         finally
         {
-            Helpers.AlreadyComparing.Remove((Guid, other.Guid));
+            AlreadyComparing.Remove(other.Guid);
         }
     }
 
@@ -144,21 +144,25 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
         return obj.GetType() == GetType() && Equals((ValueEqualityCollection<T>)obj);
     }
 
+    private bool IsHashing { get; set; } = false;
+
+    [SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
     public override int GetHashCode()
     {
-        if (!Helpers.AlreadyHashing.Add(Guid))
+        if (IsHashing)
         {
             // We are already being hashed in an upper level. Return a constant as we don't want to recurse.
             return 0;
         }
 
+        IsHashing = true;
         try
         {
             return Collection.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
         }
         finally
         {
-            Helpers.AlreadyHashing.Remove(Guid);
+            IsHashing = false;
         }
     }
 
@@ -194,21 +198,25 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         return Equals((ValueEqualityCollection<T, TCollection>)obj);
     }
 
+    private bool IsHashing { get; set; } = false;
+
+    [SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
     public override int GetHashCode()
     {
-        if (!Helpers.AlreadyHashing.Add(Guid))
+        if (IsHashing)
         {
             // We are already being hashed in an upper level. Return a constant as we don't want to recurse.
             return 0;
         }
 
+        IsHashing = true;
         try
         {
             return Underlying.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
         }
         finally
         {
-            Helpers.AlreadyHashing.Remove(Guid);
+            IsHashing = false;
         }
     }
 
@@ -261,9 +269,11 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         return ReferenceEquals(this, other) || EqualityDispatch(other);
     }
 
+    private HashSet<Guid> AlreadyComparing { get; } = [];
+
     private bool EqualityDispatch(ValueEqualityCollection<T, TCollection> other)
     {
-        if (!Helpers.AlreadyComparing.Add((Guid, other.Guid)))
+        if (!AlreadyComparing.Add(other.Guid))
         {
             // In case we are already comparing these two instances, we can safely return true as the first comparison will fail if they don't match.
             return true;
@@ -282,7 +292,7 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         }
         finally
         {
-            Helpers.AlreadyComparing.Remove((Guid, other.Guid));
+            AlreadyComparing.Remove(other.Guid);
         }
     }
 
