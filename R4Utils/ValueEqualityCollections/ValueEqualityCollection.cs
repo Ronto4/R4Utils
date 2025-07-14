@@ -116,6 +116,7 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
 
         try
         {
+            if (Count != other.Count) return false;
             if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider &&
                 Collection is IList<T> list1 &&
                 other.Collection is IList<T> list2)
@@ -196,6 +197,13 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         if (ReferenceEquals(this, obj)) return true;
         if (obj.GetType() != GetType()) return false;
         return Equals((ValueEqualityCollection<T, TCollection>)obj);
+    }
+    
+    
+
+    private readonly ref struct CachedHasher
+    {
+        public ref T 
     }
 
     private bool IsHashing { get; set; } = false;
@@ -281,6 +289,7 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
 
         try
         {
+            if (Count != other.Count) return false;
             if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider &&
                 Underlying is IList<T> list1 &&
                 other.Underlying is IList<T> list2)
