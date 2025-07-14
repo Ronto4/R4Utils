@@ -26,6 +26,7 @@ public class TestValueEqualityCollection
                 Assert.IsTrue(wrapper1.Equals(wrapper2));
                 Assert.IsTrue(wrapper1 == wrapper2);
                 Assert.IsFalse(wrapper1 != wrapper2);
+                Assert.AreEqual(wrapper1.GetHashCode(), wrapper2.GetHashCode());
             }
         }
 
@@ -164,6 +165,7 @@ public class TestValueEqualityCollection
                 Assert.IsTrue(wrapper1.Equals(wrapper2));
                 Assert.IsTrue(wrapper1 == wrapper2);
                 Assert.IsFalse(wrapper1 != wrapper2);
+                Assert.AreEqual(wrapper1.GetHashCode(), wrapper2.GetHashCode());
             }
         }
 

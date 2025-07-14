@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 
 namespace R4Utils.ValueEqualityCollections;
@@ -36,6 +37,7 @@ file static class Helpers
 
 /// <summary>
 /// A wrapper around an <see cref="ICollection{T}"/> that uses value equality of its elements for equality of the collections.
+/// <remarks>Note that this type does not guarantee any behaviour when using it in async code.</remarks>
 /// </summary>
 public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEqualityCollection<T>>,
     IEqualityOperators<ValueEqualityCollection<T>, ValueEqualityCollection<T>, bool> where T : IEquatable<T>
@@ -68,12 +70,18 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
     public OrderMode Ordering { get; }
 
     /// <summary>
+    /// An assumed unique ID for each instance of this type.
+    /// </summary>
+    private Guid Guid { get; }
+
+    /// <summary>
     /// Create a new wrapper around <paramref name="collection"/> that uses items equality for instance equality.
     /// </summary>
     public ValueEqualityCollection(ICollection<T> collection, OrderMode ordering)
     {
         Collection = collection;
         Ordering = ordering;
+        Guid = Guid.CreateVersion7();
     }
 
     public override string ToString() =>
@@ -96,15 +104,32 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
         return ReferenceEquals(this, other) || EqualityDispatch(other);
     }
 
+    private HashSet<Guid> AlreadyComparing { get; } = [];
+
     private bool EqualityDispatch(ValueEqualityCollection<T> other)
     {
-        if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider && Collection is IList<T> list1 &&
-            other.Collection is IList<T> list2)
+        if (!AlreadyComparing.Add(other.Guid))
         {
-            return OrderedEquality(list1, list2);
+            // In case we are already comparing these two instances, we can safely return true as the first comparison will fail if they don't match.
+            return true;
         }
 
-        return Helpers.ScrambledEquals(Collection, other.Collection);
+        try
+        {
+            if (Count != other.Count) return false;
+            if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider &&
+                Collection is IList<T> list1 &&
+                other.Collection is IList<T> list2)
+            {
+                return OrderedEquality(list1, list2);
+            }
+
+            return Helpers.ScrambledEquals(Collection, other.Collection);
+        }
+        finally
+        {
+            AlreadyComparing.Remove(other.Guid);
+        }
     }
 
     private static bool OrderedEquality(IList<T> list1, IList<T> list2) => list1.SequenceEqual(list2);
@@ -120,8 +145,27 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
         return obj.GetType() == GetType() && Equals((ValueEqualityCollection<T>)obj);
     }
 
-    // TODO: Look into this, this might in fact be wrong.
-    public override int GetHashCode() => HashCode.Combine(Collection.Aggregate(0, HashCode.Combine), Ordering);
+    private bool IsHashing { get; set; } = false;
+
+    [SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
+    public override int GetHashCode()
+    {
+        if (IsHashing)
+        {
+            // We are already being hashed in an upper level. Return a constant as we don't want to recurse.
+            return 0;
+        }
+
+        IsHashing = true;
+        try
+        {
+            return Collection.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
+        }
+        finally
+        {
+            IsHashing = false;
+        }
+    }
 
     public void Add(T item) => Collection.Add(item);
 
@@ -140,6 +184,7 @@ public class ValueEqualityCollection<T> : ICollection<T>, IEquatable<ValueEquali
 
 /// <summary>
 /// A wrapper around a <typeparamref name="TCollection"/> that uses value equality of its elements for equality of the collections.
+/// <remarks>Note that this type does not guarantee any behaviour when using it in async code.</remarks>
 /// </summary>
 public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
     IEquatable<ValueEqualityCollection<T, TCollection>>,
@@ -153,9 +198,35 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         if (obj.GetType() != GetType()) return false;
         return Equals((ValueEqualityCollection<T, TCollection>)obj);
     }
+    
+    
 
-    // TODO: Look into this, this might in fact be wrong.
-    public override int GetHashCode() => HashCode.Combine(Underlying.Aggregate(0, HashCode.Combine), Ordering);
+    private readonly ref struct CachedHasher
+    {
+        public ref T 
+    }
+
+    private bool IsHashing { get; set; } = false;
+
+    [SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
+    public override int GetHashCode()
+    {
+        if (IsHashing)
+        {
+            // We are already being hashed in an upper level. Return a constant as we don't want to recurse.
+            return 0;
+        }
+
+        IsHashing = true;
+        try
+        {
+            return Underlying.Aggregate(0, (current, elem) => current ^ elem.GetHashCode());
+        }
+        finally
+        {
+            IsHashing = false;
+        }
+    }
 
     /// <summary>
     /// Defines strategies of dealing with ordering when comparing two instances.
@@ -187,10 +258,16 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
     /// </summary>
     public OrderMode Ordering { get; }
 
+    /// <summary>
+    /// An assumed unique ID for each instance of this type.
+    /// </summary>
+    private Guid Guid { get; }
+
     internal ValueEqualityCollection(TCollection underlying, OrderMode ordering)
     {
         Underlying = underlying;
         Ordering = underlying is IList<T> ? ordering : OrderMode.Ignore;
+        Guid = Guid.CreateVersion7();
     }
 
     // Equality
@@ -200,15 +277,32 @@ public class ValueEqualityCollection<T, TCollection> : ICollection<T>,
         return ReferenceEquals(this, other) || EqualityDispatch(other);
     }
 
+    private HashSet<Guid> AlreadyComparing { get; } = [];
+
     private bool EqualityDispatch(ValueEqualityCollection<T, TCollection> other)
     {
-        if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider && Underlying is IList<T> list1 &&
-            other.Underlying is IList<T> list2)
+        if (!AlreadyComparing.Add(other.Guid))
         {
-            return OrderedEquality(list1, list2);
+            // In case we are already comparing these two instances, we can safely return true as the first comparison will fail if they don't match.
+            return true;
         }
 
-        return Helpers.ScrambledEquals(Underlying, other.Underlying);
+        try
+        {
+            if (Count != other.Count) return false;
+            if (Ordering is OrderMode.Consider && other.Ordering is OrderMode.Consider &&
+                Underlying is IList<T> list1 &&
+                other.Underlying is IList<T> list2)
+            {
+                return OrderedEquality(list1, list2);
+            }
+
+            return Helpers.ScrambledEquals(Underlying, other.Underlying);
+        }
+        finally
+        {
+            AlreadyComparing.Remove(other.Guid);
+        }
     }
 
     private static bool OrderedEquality(IList<T> list1, IList<T> list2) => list1.SequenceEqual(list2);
